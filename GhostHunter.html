@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Caçador de Fantasmas: A Masmorra Esquecida</title>
+<style>
+    html,body{margin:0;height:100%;background:#2b2b3a;}
+    #hud{position:fixed;top:10px;left:10px;color:#fff;font-family:monospace;font-size:14px;}
+    #screen{display:flex;position:fixed;inset:0;align-items:center;justify-content:center;overflow:auto;}
+    .panel{max-width:760px;padding:24px;text-align:center;color:#eee;font-family:Georgia,serif;}
+    .panel h1{margin:0 0 8px;font-size:34px;color:#ffb347;}
+    .panel p{margin:0 0 22px;line-height:1.5;color:#ddd;}
+    .options{display:flex;flex-wrap:wrap;justify-content:center;gap:20px;}
+    .card{background:#222;color:#fff;padding:20px;border-radius:12px;width:180px;cursor:pointer;
+        text-align:center;font-family:sans-serif;border:1px solid #444;}
+    .card:hover,.card:focus{border-color:#ffb347;outline:none;}
+    .card small{color:#999;}
+    button{padding:12px 24px;font-size:16px;cursor:pointer;}
+</style>
+</head>
+<body>
+<div id="hud">Passos: 0</div>
+<div id="screen"></div>
+<script>
+// ===== MAPA =====
+// Cada cômodo tem: name, desc, color (cor sólida do fundo) e exits (opções).
+// Cada saída tem: label (o que o jogador lê) e to (id do destino).
+const rooms = {
+  entrance: { name: 'Entrada da Masmorra', desc: 'Um arco de pedra se abre na encosta.', color: '#3a3a4a',
+    exits: [ { label: 'Portão de ferro', to: 'hall' } ] },
+  hall: { name: 'Salão das Tochas', desc: 'Tochas fracas tremem nas paredes.', color: '#5a3a1a',
+    exits: [ { label: 'Portão ao sul', to: 'entrance' },
+             { label: 'Corredor ao norte', to: 'corridor' },
+             { label: 'Porta a leste', to: 'crypt' } ] },
+  corridor: { name: 'Corredor Estreito', desc: 'O chão range sob suas botas.', color: '#2a3a3a',
+    exits: [ { label: 'Passagem ao sul', to: 'hall' },
+             { label: 'Passagem ao norte', to: 'refectory' } ] },
+  refectory: { name: 'Refeitório Abandonado', desc: 'Mesas quebradas e panelas enferrujadas.', color: '#4a2a2a',
+    exits: [ { label: 'Corredor', to: 'corridor' },
+             { label: 'Porta central', to: 'cell' },
+             { label: 'Porta à direita', to: 'cistern' } ] },
+  cell: { name: 'Cela do Carcereiro', desc: 'Uma cama de palha e correntes soltas.', color: '#33283f',
+    exits: [ { label: 'Porta ao norte', to: 'refectory' } ] },
+  cistern: { name: 'Cisterna Inundada', desc: 'Água parada até os tornozelos.', color: '#1f3550',
+    exits: [ { label: 'Porta ao norte', to: 'refectory' } ] },
+  crypt: { name: 'Cripta Antiga', desc: 'O ar é frio e pesado.', color: '#2c4a4a',
+    exits: [ { label: 'Porta a oeste', to: 'hall' },
+             { label: 'Janela gradeada', to: 'entrance' } ] },
+};
+const goalRoom = 'crypt'; // troque aqui para mudar o cômodo destino
+
+// ===== ESTADO DO JOGO =====
+const player = { room: 'entrance', steps: 0 };
+let gamePaused = true;   // bloqueia a escolha no início e no fim
+let currentChoices = [];
+
+// ===== TELA DE OPÇÕES =====
+function openRound() {
+  gamePaused = false;
+  const room = rooms[player.room];
+  currentChoices = room.exits;
+  document.body.style.background = room.color;
+
+  const screen = document.getElementById('screen');
+  screen.innerHTML = '';
+
+  const panel = document.createElement('div');
+  panel.className = 'panel';
+  panel.innerHTML = `<h1>${room.name}</h1><p>${room.desc}</p>`;
+  const options = document.createElement('div');
+  options.className = 'options';
+
+  currentChoices.forEach((exit, i) => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.tabIndex = 0;
+    card.innerHTML = `<h3>${exit.label}</h3><small>tecla ${i + 1}</small>`;
+    card.onclick = () => choose(i);
+    card.onkeydown = e => { if (e.key === 'Enter') choose(i); };
+    options.appendChild(card);
+  });
+  panel.appendChild(options);
+  screen.appendChild(panel);
+}
+
+function choose(i) {
+  if (gamePaused || !currentChoices[i]) return;
+  player.room = currentChoices[i].to;
+  player.steps += 1;
+  document.getElementById('hud').textContent = `Passos: ${player.steps}`;
+  if (player.room === goalRoom) onGameComplete();
+  else openRound();
+}
+
+// teclas 1, 2, 3... escolhem a opção
+window.addEventListener('keydown', e => {
+  const n = parseInt(e.key, 10);
+  if (n >= 1) choose(n - 1);
+});
+
+// ===== TELAS DE INÍCIO E FIM =====
+function showStartScreen() {
+  document.body.style.background = rooms[player.room].color;
+  document.getElementById('screen').innerHTML = `
+    <div class="panel">
+      <h1>Caçador de Fantasmas</h1>
+      <h2 style="margin:0 0 16px;color:#ddd;font-weight:normal;">A Masmorra Esquecida</h2>
+      <p>Você é um guerreiro. Um fantasma assombra esta masmorra.<br>
+         Explore os cômodos e encontre-o.</p>
+      <button onclick="openRound()">Entrar na masmorra</button>
+    </div>`;
+}
+
+function onGameComplete() {
+  gamePaused = true;
+  showEndScreen(`Você encontrou o fantasma na ${rooms[goalRoom].name}! Jogo concluído com sucesso em ${player.steps} passos.`);
+}
+
+function showEndScreen(message) {
+  document.body.style.background = rooms[goalRoom].color;
+  document.getElementById('screen').innerHTML = `
+    <div style="text-align:center;color:#fff;font-family:sans-serif;max-width:640px;padding:24px;">
+      <h1>${message}</h1>
+      <button onclick="location.reload()">Reiniciar</button>
+    </div>`;
+}
+
+showStartScreen();
+</script>
+</body>
+</html>
